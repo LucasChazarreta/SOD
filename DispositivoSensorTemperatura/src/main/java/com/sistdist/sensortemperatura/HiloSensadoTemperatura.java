@@ -1,5 +1,6 @@
 package com.sistdist.sensortemperatura;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Random;
@@ -7,16 +8,20 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class HiloSensadoTemperatura extends Thread {
+    private static final long PERIOD_MS = 10_000L;
+    private static final long REINTENTO_MS = 2_000L;
+
     private boolean on;
     private double temperatura;
-    private final Socket cnxServidor;
-    private final PrintWriter pw;
+    private Socket cnxServidor;
+    private PrintWriter pw;
     private final Random rand;
+    private final SensorTemperatura.ConexionProvider conexionProvider;
+    private String hostActual = "desconocido";
+    private int puertoActual = -1;
 
-    public HiloSensadoTemperatura(Socket s, PrintWriter out) {
-        this.cnxServidor = s;
-        this.pw = out;
-        this.on = false;
+    public HiloSensadoTemperatura(SensorTemperatura.ConexionProvider provider) {
+        this.conexionProvider = provider;
         this.rand = new Random();
     }
 
@@ -30,30 +35,78 @@ public class HiloSensadoTemperatura extends Thread {
 
     public double leerTemperatura() { return temperatura; }
 
-@Override
-public void run() {
-    on = true;
-    final long PERIOD_MS = 10_000L;
-    long next = ((System.currentTimeMillis() / PERIOD_MS) + 1) * PERIOD_MS;
+    @Override
+    public void run() {
+        on = true;
+        long next = System.currentTimeMillis() + PERIOD_MS;
 
-    while (on) {
-        try {
-            long wait = next - System.currentTimeMillis();
-            if (wait > 0) Thread.sleep(wait);
+        while (on) {
+            try {
+                asegurarConexion();
 
-            //temperatura = generarTemperatura();
-            temperatura = 90;
-            System.out.printf("[SENSOR-T] Generada temperatura: %.1f°C%n", temperatura);
+                long wait = next - System.currentTimeMillis();
+                if (wait > 0) {
+                    Thread.sleep(wait);
+                }
 
-            pw.println(temperatura);
-            pw.flush();
+                //temperatura = generarTemperatura();
+                temperatura = 90;
+                System.out.printf("[SENSOR-T] Temperatura: %.1f°C -> %s:%d%n", temperatura, hostActual, puertoActual);
 
-            next += PERIOD_MS;
-        } catch (InterruptedException ex) {
-            Logger.getLogger(HiloSensadoTemperatura.class.getName()).log(Level.SEVERE, null, ex);
-            on = false;
+                pw.println(temperatura);
+                pw.flush();
+
+                if (pw.checkError()) {
+                    throw new IOException("Error al escribir en el socket");
+                }
+
+                next += PERIOD_MS;
+            } catch (InterruptedException ex) {
+                Logger.getLogger(HiloSensadoTemperatura.class.getName()).log(Level.SEVERE, null, ex);
+                Thread.currentThread().interrupt();
+                on = false;
+            } catch (Exception e) {
+                System.err.println("[SENSOR-T] Error enviando datos al líder: " + e.getMessage());
+                cerrarConexionActual();
+                next = System.currentTimeMillis() + PERIOD_MS;
+                try {
+                    Thread.sleep(REINTENTO_MS);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(HiloSensadoTemperatura.class.getName()).log(Level.SEVERE, null, ex);
+                    Thread.currentThread().interrupt();
+                    on = false;
+                }
+            }
+        }
+
+        cerrarConexionActual();
+    }
+
+    private void asegurarConexion() throws Exception {
+        if (cnxServidor != null && cnxServidor.isConnected() && !cnxServidor.isClosed() && pw != null && !pw.checkError()) {
+            return;
+        }
+
+        cerrarConexionActual();
+        SensorTemperatura.ConexionLider nuevaConexion = conexionProvider.nuevaConexion();
+        this.cnxServidor = nuevaConexion.socket();
+        this.pw = nuevaConexion.writer();
+        this.hostActual = nuevaConexion.host();
+        this.puertoActual = nuevaConexion.puerto();
+    }
+
+    private void cerrarConexionActual() {
+        if (pw != null) {
+            pw.close();
+            pw = null;
+        }
+
+        if (cnxServidor != null) {
+            try {
+                cnxServidor.close();
+            } catch (IOException ignored) {
+            }
+            cnxServidor = null;
         }
     }
-}
-
 }
