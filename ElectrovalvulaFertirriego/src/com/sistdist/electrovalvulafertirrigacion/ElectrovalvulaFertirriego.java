@@ -1,4 +1,4 @@
-package com.sistdist.electrovalvulafertirriego;
+package com.sistdist.electrovalvulafertirrigacion;
 
 import java.io.*;
 import java.net.*;
