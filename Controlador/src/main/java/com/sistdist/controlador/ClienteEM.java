@@ -11,8 +11,10 @@ public final class ClienteEM {
         try {
             ref = (IServicioExclusionMutua) Naming.lookup(url);
             System.out.println("[ClienteEM] Conectado a EM: " + url);
+            Controlador.actualizarServerEM(ref);
         } catch (Exception e) {
             System.err.println("[ClienteEM] Error conectando a EM " + url + " -> " + e.getMessage());
+            Controlador.actualizarServerEM(null);
             ref = null;
         }
     }
