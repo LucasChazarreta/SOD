@@ -2,6 +2,8 @@ package com.sistdist.controlador;
 
 import java.io.PrintWriter;
 
+import com.sistdist.interfaces.IServicioExclusionMutua;
+
 public class EjecutorBomba extends Thread {
 
     @Override
@@ -14,7 +16,7 @@ public class EjecutorBomba extends Thread {
                     case FERTI -> ejecutarFerti(ord);
                 }
             } catch (InterruptedException e) { return; }
-              catch (Exception e) {
+            catch (Exception e) {
                 Controlador.logEvento("[EJECUTOR] ERROR: " + e.getMessage() + "\n");
                 e.printStackTrace();
             }
@@ -56,10 +58,22 @@ public class EjecutorBomba extends Thread {
             return;
         }
 
+        IServicioExclusionMutua em = Controlador.serverEM;
+        if (em == null) {
+            Controlador.logEvento(String.format("[RIEGO P%d] EM no disponible. Se reintentará.%n", parcela));
+            ClienteEM.reconectarConLiderActual();
+            Controlador.colaOrdenes.offer(ord);
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            return;
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append(String.format("[RIEGO P%d] Obtener token...\n", parcela));
-        Controlador.serverEM.ObtenerRecurso(Controlador.serverRMI);
+        boolean tokenObtenido = false;
+
+        em.ObtenerRecurso(Controlador.serverRMI);
         Controlador.semToken.acquireUninterruptibly();
+        tokenObtenido = true;
         sb.append("[RIEGO] Token recibido\n");
 
         // marcar dueño
@@ -73,12 +87,14 @@ public class EjecutorBomba extends Thread {
 
             // SIMULACIÓN en segundos; para minutos reales: mins * 60_000L
             Thread.sleep(8 * 1000L);
-            //Thread.sleep(10_000L);     
+            //Thread.sleep(10_000L);
             ev.println("cerrar");   ev.flush();
             bomba.println("cerrar");bomba.flush();
             sb.append("[RIEGO] Riego finalizado\n");
         } finally {
-            Controlador.serverEM.DevolverRecurso();
+            if (tokenObtenido) {
+                try { em.DevolverRecurso(); } catch (Exception ignored) {}
+            }
             sb.append("[RIEGO] Devolver token\n");
             Controlador.logEvento(sb.toString());
 
@@ -126,10 +142,22 @@ public class EjecutorBomba extends Thread {
             return;
         }
 
+        IServicioExclusionMutua em = Controlador.serverEM;
+        if (em == null) {
+            Controlador.logEvento("[FERTIRRIGACION] EM no disponible. Se reintentará.\n");
+            ClienteEM.reconectarConLiderActual();
+            Controlador.colaOrdenes.offer(ord);
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            return;
+        }
+
         // Obtener token
         evF.println("log|[FERTIRRIGACION] Obtener token..."); evF.flush();
-        Controlador.serverEM.ObtenerRecurso(Controlador.serverRMI);
+        boolean tokenObtenido = false;
+
+        em.ObtenerRecurso(Controlador.serverRMI);
         Controlador.semToken.acquireUninterruptibly();
+        tokenObtenido = true;
         evF.println("log|[FERTIRRIGACION] Token recibido"); evF.flush();
 
         // marcar dueño
@@ -146,7 +174,9 @@ public class EjecutorBomba extends Thread {
             evF.println("cerrar"); evF.flush();
             evF.println("log|[FERTIRRIGACION] Finalizada"); evF.flush();
         } finally {
-            Controlador.serverEM.DevolverRecurso();
+            if (tokenObtenido) {
+                try { em.DevolverRecurso(); } catch (Exception ignored) {}
+            }
             evF.println("log|[FERTIRRIGACION] Devolver token"); evF.flush();
 
             // liberar dueño

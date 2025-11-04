@@ -273,6 +273,10 @@ public class Controlador {
                             DirectorioCoordinador.actualizarDesdeUidLider(uidLider);
                             ClienteEM.reconectarConLiderActual();
 
+                            if (nodoAnillo != null && nodoAnillo.getMyUid() != uidLider) {
+                                ArrancadorServidorEM.detenerSiEsEste(PuertoEM.porUid(nodoAnillo.getMyUid()));
+                            }
+
                             String nuevoLiderBind = bindAnilloPorUid(uidLider);
                             int puertoDetectado = puertoCtrlPorUid(uidLider);
                             if (nuevoLiderBind != null && puertoDetectado > 0) {
@@ -339,5 +343,9 @@ public class Controlador {
         if (uid == 102) return 20001;
         if (uid == 103) return 20002;
         return -1;
+    }
+
+    public static synchronized void actualizarServerEM(IServicioExclusionMutua nuevo) {
+        serverEM = nuevo;
     }
 }

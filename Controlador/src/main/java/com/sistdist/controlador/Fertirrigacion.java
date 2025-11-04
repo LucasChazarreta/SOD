@@ -3,6 +3,8 @@ package com.sistdist.controlador;
 import java.io.PrintWriter;
 import java.util.Random;
 
+import com.sistdist.interfaces.IServicioExclusionMutua;
+
 public class Fertirrigacion extends Thread {
 
     private static final int INTERVALO_MIN_S = 30;//5 20
@@ -32,11 +34,24 @@ public class Fertirrigacion extends Thread {
         if (bomba == null || evF == null) return;
         if (!Controlador.colaOrdenes.isEmpty()) return; // evitar competir con riego encolado
 
+        IServicioExclusionMutua em = Controlador.serverEM;
+        if (em == null) {
+            logToEVFerti("[FERTIRRIGACION] EM no disponible. Reintentando...");
+            ClienteEM.reconectarConLiderActual();
+            em = Controlador.serverEM;
+            if (em == null) {
+                return;
+            }
+        }
+
+        boolean tokenObtenido = false;
+
         try {
             logToEVFerti("[FERTIRRIGACION] Intento automatico...");
             logToEVFerti("[FERTIRRIGACION] Obtener token...");
-            Controlador.serverEM.ObtenerRecurso(Controlador.serverRMI);
+            em.ObtenerRecurso(Controlador.serverRMI);
             Controlador.semToken.acquireUninterruptibly();
+            tokenObtenido = true;
             logToEVFerti("[FERTIRRIGACION] Token recibido");
 
             // marcar dueño
@@ -44,7 +59,7 @@ public class Fertirrigacion extends Thread {
             Controlador.duenoToken = "FERTIRRIGACION";
 
             if (Boolean.TRUE.equals(Controlador.lluvia)) {
-                Controlador.serverEM.DevolverRecurso();
+                em.DevolverRecurso();
                 logToEVFerti("[FERTIRRIGACION] Devolver token");
                 Controlador.tokenEnUso.set(false);
                 Controlador.duenoToken = null;
@@ -61,7 +76,9 @@ public class Fertirrigacion extends Thread {
             logToEVFerti("[FERTIRRIGACION] ERROR: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            try { Controlador.serverEM.DevolverRecurso(); } catch (Exception ignored) {}
+            if (tokenObtenido) {
+                try { em.DevolverRecurso(); } catch (Exception ignored) {}
+            }
             logToEVFerti("[FERTIRRIGACION] Devolver token");
             Controlador.tokenEnUso.set(false);
             Controlador.duenoToken = null;
