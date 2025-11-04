@@ -23,4 +23,5 @@ com\sistdist\controlador\Controlador.class
 com\sistdist\election\RingElection.class
 com\sistdist\controlador\ArrancadorServidorEM.class
 com\sistdist\controlador\HiloReceptorTemperatura.class
+com\sistdist\election\RingNode$RingParticipant.class
 com\sistdist\election\RingNode.class

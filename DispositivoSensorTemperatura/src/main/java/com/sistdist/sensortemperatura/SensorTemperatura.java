@@ -13,6 +13,8 @@ public class SensorTemperatura {
     private static final String HOST_POR_DEFECTO = "localhost";
     private static final int PUERTO_POR_DEFECTO = 20000;
 
+    private static volatile LiderInfo ultimoLiderConocido = new LiderInfo(HOST_POR_DEFECTO, PUERTO_POR_DEFECTO);
+
     public static void main(String[] args) {
         HiloSensadoTemperatura hilo = new HiloSensadoTemperatura(SensorTemperatura::abrirConexionConLider);
         hilo.start();
@@ -32,8 +34,9 @@ public class SensorTemperatura {
     }
 
     private static LiderInfo obtenerInfoLider() {
-        String host = HOST_POR_DEFECTO;
-        int puerto = PUERTO_POR_DEFECTO;
+        LiderInfo ultimoLider = ultimoLiderConocido;
+        String host = ultimoLider.host();
+        int puerto = ultimoLider.puerto();
 
         try {
             IControladorLider stub = (IControladorLider) Naming.lookup(LIDER_BIND);
@@ -45,10 +48,12 @@ public class SensorTemperatura {
                 puerto = puertoObtenido;
             }
 
+            LiderInfo nuevoLider = new LiderInfo(host, puerto);
+            ultimoLiderConocido = nuevoLider;
             System.out.println("[SensorTemperatura] Líder actual: " + host + ":" + puerto);
         } catch (Exception e) {
             System.err.println("[SensorTemperatura] No se pudo obtener líder actual (" + e.getMessage()
-                    + "), usando " + host + ":" + puerto);
+                    + "), usando último conocido " + host + ":" + puerto);
         }
 
         return new LiderInfo(host, puerto);
