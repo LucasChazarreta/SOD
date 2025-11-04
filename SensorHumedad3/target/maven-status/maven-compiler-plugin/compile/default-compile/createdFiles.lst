@@ -1,2 +1,5 @@
-com\sistdist\sensorhumedad3\HiloSensado.class
+com\sistdist\sensorhumedad3\SensorHumedad3$ConexionLider.class
+com\sistdist\sensorhumedad3\SensorHumedad3$ConexionProvider.class
 com\sistdist\sensorhumedad3\SensorHumedad3.class
+com\sistdist\sensorhumedad3\HiloSensado.class
+com\sistdist\sensorhumedad3\SensorHumedad3$LiderInfo.class

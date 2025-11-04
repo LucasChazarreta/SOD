@@ -11,4 +11,11 @@
         <exec.mainClass>com.sistdist.sensorhumedad1.SensorHumedad2</exec.mainClass>
     </properties>
     <name>SensorHumedad2</name>
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>Controlador</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
 </project>

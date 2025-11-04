@@ -1,0 +1,5 @@
+com\sistdist\sensortemperatura\HiloSensadoTemperatura.class
+com\sistdist\sensortemperatura\SensorTemperatura.class
+com\sistdist\sensortemperatura\SensorTemperatura$ConexionLider.class
+com\sistdist\sensortemperatura\SensorTemperatura$ConexionProvider.class
+com\sistdist\sensortemperatura\SensorTemperatura$LiderInfo.class
