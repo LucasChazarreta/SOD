@@ -1,39 +1,84 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- */
 package com.sistdist.sensorhumedad4;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.rmi.Naming;
 
-/**
- *
- * @author lesca
- */
+import com.sistdist.interfaces.IControladorLider;
+
 public class SensorHumedad4 {
 
+    private static final String LIDER_BIND = "rmi://localhost:1099/ControladorLider";
+    private static final String HOST_POR_DEFECTO = "localhost";
+    private static final int PUERTO_POR_DEFECTO = 20000;
+
     public static void main(String[] args) {
-        InetAddress IPServidor;
-        PrintWriter pw;
+        HiloSensado sensor = new HiloSensado(SensorHumedad4::abrirConexionConLider);
+        sensor.start();
+    }
+
+    private static ConexionLider abrirConexionConLider() throws Exception {
+        LiderInfo info = obtenerInfoLider();
+        InetAddress ipServidor = InetAddress.getByName(info.host());
+        Socket socket = new Socket(ipServidor, info.puerto());
+        PrintWriter pw = new PrintWriter(socket.getOutputStream(), true);
+
+        pw.println("sensorHumedad;4");
+        pw.flush();
+
+        System.out.printf("[SENSOR-H4] Conectado al líder en %s:%d%n", info.host(), info.puerto());
+        return new ConexionLider(socket, pw, info.host(), info.puerto());
+    }
+
+    private static LiderInfo obtenerInfoLider() {
+        String host = HOST_POR_DEFECTO;
+        int puerto = PUERTO_POR_DEFECTO;
+
         try {
-            IPServidor = InetAddress.getByName("127.0.0.1");
-            Socket cliente = new Socket(IPServidor, 20000);
-            pw = new PrintWriter(cliente.getOutputStream());
-            pw.println("sensorHumedad;4");
-            pw.flush();
-            HiloSensado sensor = new HiloSensado(cliente, pw);
-            sensor.start();
-            
-        } catch (UnknownHostException ex) {
-            Logger.getLogger(SensorHumedad4.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(SensorHumedad4.class.getName()).log(Level.SEVERE, null, ex);
+            IControladorLider stub = (IControladorLider) Naming.lookup(LIDER_BIND);
+            String direccion = stub.obtenerLiderActual();
+            host = extraerHost(direccion, host);
+
+            int puertoObtenido = stub.obtenerPuertoLider();
+            if (puertoObtenido > 0) {
+                puerto = puertoObtenido;
+            }
+
+            System.out.printf("[SENSOR-H4] Líder actual: %s:%d%n", host, puerto);
+        } catch (Exception e) {
+            System.err.printf("[SENSOR-H4] No se pudo obtener líder actual (%s), usando %s:%d%n", e.getMessage(), host,
+                    puerto);
         }
 
+        return new LiderInfo(host, puerto);
+    }
+
+    private static String extraerHost(String direccionRmi, String hostPorDefecto) {
+        if (direccionRmi == null || direccionRmi.isEmpty()) {
+            return hostPorDefecto;
+        }
+
+        String sinPrefijo = direccionRmi.replaceFirst("^rmi://", "");
+        int finHost = sinPrefijo.indexOf('/');
+        String hostYPuerto = finHost >= 0 ? sinPrefijo.substring(0, finHost) : sinPrefijo;
+
+        int separadorPuerto = hostYPuerto.indexOf(':');
+        if (separadorPuerto >= 0) {
+            return hostYPuerto.substring(0, separadorPuerto);
+        }
+
+        return hostYPuerto;
+    }
+
+    @FunctionalInterface
+    public interface ConexionProvider {
+        ConexionLider nuevaConexion() throws Exception;
+    }
+
+    public record ConexionLider(Socket socket, PrintWriter writer, String host, int puerto) {
+    }
+
+    private record LiderInfo(String host, int puerto) {
     }
 }
